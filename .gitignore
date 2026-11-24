@@ -157,3 +157,8 @@ Desktop.ini
 *Credentials*.xlsx
 *passwords*.xlsx
 *secrets*.xlsx
+# Celery runtime files
+**/celerybeat-schedule*
+**/celerybeat.pid
+**/*.sqlite-shm
+**/*.sqlite-wal
