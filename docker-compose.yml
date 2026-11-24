@@ -1,0 +1,99 @@
+# Manima One local development stack
+# Frontend: http://localhost:3000
+# API docs: http://localhost:8000/api/docs
+# Host ports: PostgreSQL 5433, Valkey 6380; internal ports remain 5432/6379.
+
+x-api-env: &api-env
+  MANIMA_ENVIRONMENT: local
+  MANIMA_DATABASE_URL: postgresql+psycopg://manima_app:${MANIMA_APP_PASSWORD}@postgres:5432/manima
+  MANIMA_PLATFORM_DATABASE_URL: postgresql+psycopg://manima_platform:${MANIMA_PLATFORM_PASSWORD}@postgres:5432/manima
+  MANIMA_MIGRATION_DATABASE_URL: postgresql+psycopg://manima:${MANIMA_OWNER_PASSWORD}@postgres:5432/manima
+  MANIMA_REDIS_URL: redis://valkey:6379/0
+  MANIMA_CORS_ORIGINS: '["http://localhost:3000"]'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MANIMA_OWNER_PASSWORD: ${MANIMA_OWNER_PASSWORD}
+      MANIMA_APP_PASSWORD: ${MANIMA_APP_PASSWORD}
+      MANIMA_PLATFORM_PASSWORD: ${MANIMA_PLATFORM_PASSWORD}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-manima.sh:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d manima"]
+      interval: 5s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment:
+      <<: *api-env
+      MANIMA_BOOTSTRAP_ADMIN_EMAIL: ${MANIMA_BOOTSTRAP_ADMIN_EMAIL}
+      MANIMA_BOOTSTRAP_ADMIN_PASSWORD: ${MANIMA_BOOTSTRAP_ADMIN_PASSWORD}
+    command: ["sh", "-c", "alembic upgrade head && python -m manima.cli bootstrap"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment: *api-env
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+
+  relay:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment: *api-env
+    command: ["python", "-m", "manima.workers.relay"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+
+  worker:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment: *api-env
+    command: ["celery", "-A", "manima.workers.celery_app", "worker", "-Q", "critical,default", "-l", "info"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+
+  beat:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment: *api-env
+    command: ["celery", "-A", "manima.workers.celery_app", "beat", "-l", "info", "-s", "/tmp/celerybeat-schedule"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args: { API_URL: http://api:8000 }
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api: { condition: service_started }
+
+volumes:
+  pgdata:

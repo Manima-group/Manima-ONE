@@ -1,0 +1,52 @@
+name: ci-api
+on:
+  pull_request:
+    paths: ["apps/api/**", ".github/workflows/ci-api.yml"]
+  push:
+    branches: [main]
+    paths: ["apps/api/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/api } }
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports: ["6379:6379"]
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12", enable-cache: true }
+      - name: Database roles (mirrors infrastructure/docker/postgres-init.sh)
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create role manima login password 'manima' createdb;
+          create role manima_app login password 'manima_app' nosuperuser nobypassrls;
+          create role manima_platform login password 'manima_platform' nosuperuser bypassrls;
+          create database manima_test owner manima;
+          \c manima_test
+          create extension citext;
+          SQL
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check src tests && uv run ruff format --check src tests
+      - name: Migrations apply from scratch, then downgrade/upgrade round-trip
+        env:
+          MANIMA_MIGRATION_DATABASE_URL: postgresql+psycopg://manima:manima@localhost:5432/manima_test
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade 0002
+          uv run alembic upgrade head
+      - name: Unit, integration, isolation (release-blocking), contract tests
+        run: uv run pytest -o addopts="" -p no:warnings

@@ -1,0 +1,63 @@
+name: e2e
+on:
+  pull_request:
+    paths: ["apps/**", "tests/e2e/**"]
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+      valkey:
+        image: valkey/valkey:8-alpine
+        ports: ["6379:6379"]
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      MANIMA_EVENTS_EAGER: "false"
+      MANIMA_BOOTSTRAP_ADMIN_EMAIL: admin@manima.local
+      MANIMA_BOOTSTRAP_ADMIN_PASSWORD: Admin@12345
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - name: Database
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          create role manima login password 'manima';
+          create role manima_app login password 'manima_app' nobypassrls;
+          create role manima_platform login password 'manima_platform' bypassrls;
+          create database manima owner manima;
+          \c manima
+          create extension citext;
+          SQL
+      - name: API, relay, worker
+        working-directory: apps/api
+        run: |
+          uv sync --frozen
+          uv run alembic upgrade head
+          uv run python -m manima.cli bootstrap
+          uv run python -m manima.cli seed-demo
+          nohup uv run uvicorn manima.main:app --port 8000 > api.log 2>&1 &
+          nohup uv run python -m manima.workers.relay > relay.log 2>&1 &
+          nohup uv run celery -A manima.workers.celery_app worker -B -Q critical,default > worker.log 2>&1 &
+      - name: Web
+        working-directory: apps/web
+        run: |
+          npm ci && npm run build
+          cp -r .next/static .next/standalone/.next/
+          nohup node .next/standalone/server.js > web.log 2>&1 &
+          npx wait-on http://localhost:3000/login
+      - run: pip install playwright==1.* && python -m playwright install --with-deps chromium
+      - run: python tests/e2e/smoke.py && python tests/e2e/workflow.py
+        env: { PLAYWRIGHT_CHANNEL: chromium }
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: e2e-out, path: "tests/e2e/out\napps/api/*.log\napps/web/web.log" }

@@ -1,0 +1,159 @@
+# ==========================================
+# MANIMA ONE — GLOBAL GITIGNORE
+# Manima AI-Tech Solutions
+# ==========================================
+
+# Environment variables and secrets
+.env
+.env.*
+.venv
+.venv*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+service-account*.json
+secrets/
+
+# Python virtual environments
+**/.venv/
+**/.venv-backup-*/
+**/venv/
+**/ENV/
+
+# Python cache and build artifacts
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.hypothesis/
+**/.coverage
+**/.coverage.*
+**/htmlcov/
+**/.tox/
+**/.nox/
+
+# Node.js
+**/node_modules/
+**/.npm/
+**/.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js and frontend
+**/.next/
+**/.nuxt/
+**/.turbo/
+**/.vercel/
+**/out/
+**/dist/
+**/build/
+**/*.tsbuildinfo
+**/.eslintcache
+
+# Testing and automation
+tests/e2e/out/
+**/test-results/
+**/playwright-report/
+**/playwright/.cache/
+**/coverage/
+**/allure-results/
+**/allure-report/
+
+# PostgreSQL and database files
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.sql.gz
+**/pgdata/
+**/postgres-data/
+**/database-backups/
+
+# Redis and Valkey
+dump.rdb
+appendonly.aof
+**/redis-data/
+**/valkey-data/
+
+# Docker local data
+**/docker-data/
+**/docker-volumes/
+docker-compose.override.yml
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!example.tfvars
+crash.log
+
+# Kubernetes secrets
+k8s/secrets/
+kubernetes/secrets/
+kubeconfig
+
+# Logs
+*.log
+**/logs/
+**/log/
+
+# Temporary files
+**/tmp/
+**/temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*.pid
+
+# Uploaded files and generated reports
+**/uploads/
+**/generated-reports/
+**/exports/
+**/backups/
+
+# AI and local model files
+**/model-cache/
+**/.huggingface/
+*.safetensors
+*.gguf
+*.onnx
+*.pt
+*.pth
+
+# AI development tools — local settings
+.claude/settings.local.json
+.cursor/mcp.json
+.mcp.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.iml
+.history/
+
+# Operating system
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Private credential spreadsheets
+*credentials*.xlsx
+*Credentials*.xlsx
+*passwords*.xlsx
+*secrets*.xlsx

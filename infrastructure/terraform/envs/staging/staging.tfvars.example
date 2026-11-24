@@ -1,0 +1,8 @@
+image_tag       = "sha-REPLACE"
+ecr_registry    = "123456789012.dkr.ecr.ap-south-1.amazonaws.com"
+certificate_arn = "arn:aws:acm:ap-south-1:123456789012:certificate/REPLACE"
+secret_arns = {
+  database_url           = "arn:aws:secretsmanager:ap-south-1:123456789012:secret:manima/staging/database_url"
+  platform_database_url  = "arn:aws:secretsmanager:ap-south-1:123456789012:secret:manima/staging/platform_database_url"
+  migration_database_url = "arn:aws:secretsmanager:ap-south-1:123456789012:secret:manima/staging/migration_database_url"
+}
