@@ -1,7 +1,7 @@
 # Manima One local development stack
 # Frontend: http://localhost:3000
-# API docs: http://localhost:8000/api/docs
-# Host ports: PostgreSQL 5433, Valkey 6380; internal ports remain 5432/6379.
+# API docs: http://localhost:8001/api/docs
+# Host ports: PostgreSQL 5434, Valkey 6380; internal ports remain 5432/6379.
 
 x-api-env: &api-env
   MANIMA_ENVIRONMENT: local
@@ -25,7 +25,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./infrastructure/docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-manima.sh:ro
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5434:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d manima"]
       interval: 5s
@@ -54,7 +54,7 @@ services:
     build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
     environment: *api-env
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8000"
     depends_on:
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
@@ -70,7 +70,7 @@ services:
   worker:
     build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
     environment: *api-env
-    command: ["celery", "-A", "manima.workers.celery_app", "worker", "-Q", "critical,default", "-l", "info"]
+    command: ["celery", "-A", "manima.workers.celery_app", "worker", "-Q", "critical,default", "-l", "info", "--concurrency=2"]
     depends_on:
       migrate: { condition: service_completed_successfully }
       valkey: { condition: service_healthy }
